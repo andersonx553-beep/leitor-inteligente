@@ -751,7 +751,7 @@ function authGate(mode='login', message='', isErr=false){
     msg.className='auth-msg'; msg.textContent=login?'Entrando…':'Criando acesso…';
     try{
       if(login){ const {data,error}=await sb.auth.signInWithPassword({email,password}); if(error) throw error; await startCloud(data.session); }
-      else { const {data,error}=await sb.auth.signUp({email,password}); if(error) throw error; if(data.session) await startCloud(data.session); else authGate('login','Cadastro criado. Confirme o e-mail enviado pelo Supabase e depois entre.'); }
+      else { const {data,error}=await sb.auth.signUp({email,password}); if(error) throw error; if(data.session) await startCloud(data.session); else authGate('login','Cadastro criado. Confirme o e-mail enviado pelo Supabase. Se a confirmação abrir localhost, pode fechar essa página, voltar para este site e entrar normalmente.'); }
     }catch(err){ authGate(mode,cloudError(err,'Não foi possível autenticar.'),true); }
   };
 }
