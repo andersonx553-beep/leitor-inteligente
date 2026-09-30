@@ -734,29 +734,38 @@ async function rpc(name,args){
 }
 async function refreshCloud(){ await load(); render(); }
 
-function authGate(mode='login', message='', isErr=false){
+function authGate(message='', isErr=false){
   document.querySelector('.app').style.display='none';
-  let gate=document.getElementById('auth-gate'); if(!gate){ gate=document.createElement('div'); gate.id='auth-gate'; gate.className='auth-gate'; document.body.appendChild(gate); }
-  const login = mode==='login';
-  gate.innerHTML=`<div class="auth-card"><div class="auth-brand"><div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 10.5V20h14v-9.5"/><path d="M9 20v-5h6v5"/></svg></div><div><h2>Almox Aqua</h2><p>Estoque e NF-e sincronizados com Supabase</p></div></div>
-    <div class="auth-tabs"><button id="auth-tab-login" class="${login?'on':''}">Entrar</button><button id="auth-tab-signup" class="${!login?'on':''}">Criar acesso</button></div>
-    <form class="auth-form" id="auth-form"><div class="field"><label>E-mail</label><input class="input" id="auth-email" type="email" autocomplete="email" required></div>
-    <div class="field"><label>Senha</label><input class="input" id="auth-pass" type="password" autocomplete="${login?'current-password':'new-password'}" minlength="6" required></div>
-    <div class="auth-msg ${isErr?'err':''}" id="auth-msg">${esc(message)}</div><button class="btn primary lg block" type="submit">${login?'Entrar no Almox':'Criar meu acesso'}</button></form>
-    <div class="auth-note">Os dados do estoque não ficam públicos. O site usa somente a chave publicável do Supabase, protegida por RLS; nenhuma chave administrativa fica no HTML.</div></div>`;
-  gate.querySelector('#auth-tab-login').onclick=()=>authGate('login');
-  gate.querySelector('#auth-tab-signup').onclick=()=>authGate('signup');
-  gate.querySelector('#auth-form').onsubmit=async e=>{
-    e.preventDefault(); const email=gate.querySelector('#auth-email').value.trim(); const password=gate.querySelector('#auth-pass').value; const msg=gate.querySelector('#auth-msg');
-    msg.className='auth-msg'; msg.textContent=login?'Entrando…':'Criando acesso…';
-    try{
-      if(login){ const {data,error}=await sb.auth.signInWithPassword({email,password}); if(error) throw error; await startCloud(data.session); }
-      else { const {data,error}=await sb.auth.signUp({email,password}); if(error) throw error; if(data.session) await startCloud(data.session); else authGate('login','Cadastro criado. Confirme o e-mail enviado pelo Supabase. Se a confirmação abrir localhost, pode fechar essa página, voltar para este site e entrar normalmente.'); }
-    }catch(err){ authGate(mode,cloudError(err,'Não foi possível autenticar.'),true); }
+  let gate=document.getElementById('auth-gate');
+  if(!gate){
+    gate=document.createElement('div');
+    gate.id='auth-gate';
+    gate.className='auth-gate';
+    document.body.appendChild(gate);
+  }
+  gate.innerHTML=`<div class="auth-card">
+    <div class="auth-brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 10.5V20h14v-9.5"/><path d="M9 20v-5h6v5"/></svg></div>
+      <div><h2>Almox Aqua</h2><p>Estoque e NF-e sincronizados com Supabase</p></div>
+    </div>
+    <div class="auth-msg ${isErr?'err':''}" id="auth-msg">${esc(message)}</div>
+    <button class="btn primary lg block" id="firebase-google-btn" type="button">
+      Entrar com Google
+    </button>
+    <div class="auth-note">
+      O acesso agora será feito pelo Google usando Firebase Authentication. O banco de estoque continua protegido no Supabase.
+    </div>
+  </div>`;
+
+  gate.querySelector('#firebase-google-btn').onclick=()=>{
+    const msg=gate.querySelector('#auth-msg');
+    msg.className='auth-msg';
+    msg.textContent='Firebase ainda não configurado neste site. Envie o firebaseConfig do projeto para concluir o Login com Google.';
   };
 }
+
 async function startCloud(session){
-  if(!session?.user) return authGate('login');
+  if(!session?.user) return authGate();
   CLOUD_USER=session.user;
   try{
     WORKSPACE_ID=await rpc('claim_almox_workspace',{});
@@ -764,7 +773,9 @@ async function startCloud(session){
     document.querySelector('.app').style.display='';
     await load();
     const r=location.hash.slice(1); go(ROUTES[r]?r:'painel');
-  }catch(err){ authGate('login', /WORKSPACE_ALREADY_CLAIMED/.test(err.message||'') ? 'Este Almox Aqua já possui um proprietário. Entre com o e-mail autorizado.' : cloudError(err), true); }
+  }catch(err){
+    authGate(cloudError(err,'Não foi possível abrir o Almox Aqua.'),true);
+  }
 }
 const getProd = id => db.produtos.find(p => p.id === id);
 const getForn = id => db.fornecedores.find(f => f.id === id);
@@ -2040,9 +2051,7 @@ function setTheme(t){ document.documentElement.dataset.theme = t; try { localSto
   let t=null; try{t=localStorage.getItem('almox.theme');}catch{}
   setTheme(t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
   if(!window.supabase){ document.querySelector('.app').style.display='none'; alert('Não foi possível carregar a biblioteca do Supabase. Verifique sua conexão com a internet.'); return; }
-  const {data,error}=await sb.auth.getSession();
-  if(error){authGate('login',cloudError(error),true);return;}
-  if(data.session) await startCloud(data.session); else authGate('login');
+  authGate();
 })();
 
 </script>
